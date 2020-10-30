@@ -2,11 +2,15 @@ const endpointUrl = 'http://localhost:9000/graphql'
 
 const graphQlRequest = async (query, variables = {}) => {
   const response = await fetch(endpointUrl, {
-    method: 'Post',
+    method: 'POST',
     headers: {'content-type': 'application/json'},
     body: JSON.stringify({query, variables})
   });
   const reponseBody = await response.json();
+  if (reponseBody.errors) {
+    const message = reponseBody.errors.map((error) => error.message).join('\n');
+    throw new Error(message)
+  }
   return reponseBody.data;
 }
 
@@ -38,7 +42,19 @@ export const loadJob = async (id) => {
       description
     }
   }`
-  const {job} = await graphQlRequest(query, id)
+  const {job} = await graphQlRequest(query, {id})
   return job;
+}
+
+export const loadCompany = async (id) => {
+  const query = `query CompanyQuery($id: ID!) {
+    company(id: $id) {
+      id
+      name
+      description
+    }
+  }`
+  const {company} = await graphQlRequest(query, {id});
+  return company;
 
 }
