@@ -8,12 +8,12 @@ const authLink = new ApolloLink((operation, forward) => {
   if (isLoggedIn()) {
         operation.setContext({
           headers: {
-            'authorization': 'Bearer ' + getAccessToken()
+            'authorization': 'Bearer ' + getAccessToken(),
           }
         })
       }
   return forward(operation);
-})
+});
 
 const client = new ApolloClient({
   link: ApolloLink.from([
@@ -21,90 +21,81 @@ const client = new ApolloClient({
     new HttpLink({uri: endpointUrl}),
   ]), 
   cache: new InMemoryCache(),
-})
+});
 
-const jobQuery = gql`query JobQuery($id: ID!) {
-  job(id: $id ) {
+const jobDetailFragment = gql`
+  fragment JobDetail on Job {
     id
     title
     company {
-      id 
+      id
       name
     }
     description
   }
+`;
+
+const jobQuery = gql`
+  query JobQuery($id: ID!) {
+    job(id: $id ) {
+      ...JobDetail
+    }
+  }
+  ${jobDetailFragment}
+`;
+
+const jobsQuery = gql`{
+  jobs {
+    title
+    id
+    company {
+      id
+      name
+    }
+  }
 }
 `;
 
-// const graphQlRequest = async (query, variables = {}) => {
-//   const request = {
-//     method: 'POST',
-//     headers: {'content-type': 'application/json'},
-//     body: JSON.stringify({query, variables})
-//   };
-//   if (isLoggedIn()) {
-//     request.headers['authorization'] = 'Bearer ' + getAccessToken();
-//   }
-//   const response = await fetch(endpointUrl, request);
-//   const reponseBody = await response.json();
-//   if (reponseBody.errors) {
-//     const message = reponseBody.errors.map((error) => error.message).join('\n');
-//     throw new Error(message)
-//   }
-//   return reponseBody.data;
-// }
+const companyQuery = gql`query CompanyQuery($id: ID!) {
+  company(id: $id) {
+    id
+    name
+    description
+    jobs {
+      id
+      title
+    }
+  }
+}
+`;
+
+const createJobsMutation = gql`mutation CreateJob($input: CreateJobInput) {
+  job: createJob(input: $input) {
+    ...JobDetail
+  }
+  ${jobDetailFragment}
+}
+`;
 
 export const loadJobs = async () => {
-  const query = gql`{
-      jobs {
-        title
-        id
-        company {
-          id
-          name
-        }
-      }
-    }`;
-  const {data: {jobs}} = await client.query({query, cache: 'no-cache'})
+  const {data: {jobs}} = await client.query({query: jobsQuery, cache: 'no-cache'});
   return jobs;
-}
+};
 
 export const loadJob = async (id) => {
-  const {data: {job}} = await client.query({query: jobQuery, variables: {id}})
+  const {data: {job}} = await client.query({query: jobQuery, variables: {id}});
   return job;
-}
+};
 
 export const loadCompany = async (id) => {
-  const query = gql`query CompanyQuery($id: ID!) {
-      company(id: $id) {
-        id
-        name
-        description
-        jobs {
-          id
-          title
-        }
-      }
-    }`
-  const {data: {company}} = await client.query({query, variables: {id}});
+  const {data: {company}} = await client.query({query: companyQuery, variables: {id}});
   return company;
-
-}
+  
+};
 
 export const createJob = async(input) => {
-  const mutation = gql`mutation CreateJob($input: CreateJobInput) {
-      job: createJob(input: $input) {
-        id
-        title
-        company {
-          id 
-          name
-        }
-        description
-      }
-    }`;
   const {data: {job}} = await client.mutate({
-    mutation,
+    mutation: createJobsMutation,
     variables: {input},
     update: (cache, {data}) => {
       cache.writeQuery({
@@ -113,7 +104,23 @@ export const createJob = async(input) => {
         data
       })
     }})
-  return job;
-}
-
-
+    return job;
+  };
+  
+  // const graphQlRequest = async (query, variables = {}) => {
+  //   const request = {
+  //     method: 'POST',
+  //     headers: {'content-type': 'application/json'},
+  //     body: JSON.stringify({query, variables})
+  //   };
+  //   if (isLoggedIn()) {
+  //     request.headers['authorization'] = 'Bearer ' + getAccessToken();
+  //   }
+  //   const response = await fetch(endpointUrl, request);
+  //   const reponseBody = await response.json();
+  //   if (reponseBody.errors) {
+  //     const message = reponseBody.errors.map((error) => error.message).join('\n');
+  //     throw new Error(message)
+  //   }
+  //   return reponseBody.data;
+  // }
